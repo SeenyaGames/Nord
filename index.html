@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nord</title>
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Nord">
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--accent:#38bdf8;--text:#e2e8f0;--muted:#94a3b8}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:16px;padding-bottom:90px}
+h1{font-size:22px}
+.sub{color:var(--muted);font-size:13px;margin:4px 0 16px}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{flex:1;padding:12px;border-radius:12px;background:var(--card);color:var(--muted);text-align:center;font-weight:600;border:0}
+.tab.on{background:var(--accent);color:#0f172a}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-bottom:10px}
+.card h3{font-size:15px}
+.card p{font-size:13px;color:var(--muted);margin-top:4px}
+.badge{display:inline-block;margin-top:8px;font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(56,189,248,.15);color:var(--accent)}
+.badge.ok{background:rgba(34,197,94,.15);color:#4ade80}
+.empty{text-align:center;color:var(--muted);padding:36px 0}
+.add{position:fixed;left:16px;right:16px;bottom:20px;padding:14px;border:0;border-radius:14px;background:var(--accent);color:#0f172a;font-weight:700}
+.del{float:right;background:0;border:0;color:#f87171;font-size:22px;line-height:1}
+</style>
+</head>
+<body>
+<h1>Nord</h1>
+<p class="sub">Rendez-vous et objectifs</p>
+<div class="tabs">
+<button class="tab on" id="t1" type="button">Rendez-vous</button>
+<button class="tab" id="t2" type="button">Objectifs</button>
+</div>
+<div id="list"></div>
+<button class="add" id="add" type="button">+ Ajouter</button>
+<script>
+const KEY="nord_v2";
+let tab="rdv";
+let data=JSON.parse(localStorage.getItem(KEY)||"null")||{rdv:[],obj:[]};
+if(!Array.isArray(data.rdv)) data.rdv=[];
+if(!Array.isArray(data.obj)) data.obj=[];
+const save=()=>localStorage.setItem(KEY,JSON.stringify(data));
+const list=document.getElementById("list");
+function draw(){
+  const items=tab==="rdv"?data.rdv:data.obj;
+  if(!items.length){list.innerHTML='<p class="empty">Rien pour le moment.</p>';return;}
+  list.innerHTML=items.map((x,i)=>tab==="rdv"
+    ?`<div class="card"><button class="del" data-i="\( {i}">×</button><h3> \){x.title}</h3><p>${x.date||""} \( {x.time||""}</p> \){x.note?`<p>${x.note}</p>`:""}</div>`
+    :`<div class="card"><button class="del" data-i="\( {i}">×</button><h3> \){x.title}</h3><p>${x.deadline||"Sans échéance"}</p><span class="badge \( {x.done?"ok":""}" data-t=" \){i}">${x.done?"Atteint":"En cours"}</span></div>`
+  ).join("");
+}
+document.getElementById("t1").onclick=()=>{tab="rdv";document.getElementById("t1").classList.add("on");document.getElementById("t2").classList.remove("on");draw();};
+document.getElementById("t2").onclick=()=>{tab="obj";document.getElementById("t2").classList.add("on");document.getElementById("t1").classList.remove("on");draw();};
+document.getElementById("add").onclick=()=>{
+  const title=prompt(tab==="rdv"?"Titre du rendez-vous :":"Titre de l'objectif :");
+  if(!title) return;
+  if(tab==="rdv"){
+    const date=prompt("Date (AAAA-MM-JJ) :","2026-09-07")||"";
+    const time=prompt("Heure (HH:MM) :","09:00")||"";
+    const note=prompt("Note (facultatif) :")||"";
+    data.rdv.push({title,date,time,note});
+  }else{
+    const deadline=prompt("Échéance (AAAA-MM-JJ, facultatif) :")||"";
+    data.obj.push({title,deadline,done:false});
+  }
+  save();draw();
+};
+list.onclick=(e)=>{
+  const del=e.target.closest(".del");
+  if(del){(tab==="rdv"?data.rdv:data.obj).splice(+del.dataset.i,1);save();draw();return;}
+  const b=e.target.closest(".badge");
+  if(b){data.obj[+b.dataset.t].done=!data.obj[+b.dataset.t].done;save();draw();}
+};
+draw();
+</script>
+</body>
+</html>
