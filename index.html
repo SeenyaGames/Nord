@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nord</title>
 <style>
-body{margin:0;background:#0f172a;color:#e2e8f0;font-family:sans-serif;padding:16px 16px 90px}
+body{margin:0;background:#0f172a;color:#e2e8f0;font-family:sans-serif;padding:16px 16px 96px}
 .tab{display:inline-block;padding:10px 14px;margin:8px 8px 16px 0;background:#1e293b;border-radius:12px}
 .on{background:#38bdf8;color:#0f172a}
 .card{background:#1e293b;padding:12px;border-radius:12px;margin:0 0 8px}
 .add{position:fixed;left:16px;right:16px;bottom:16px;padding:14px;background:#38bdf8;color:#0f172a;border:0;border-radius:12px;font-weight:700}
 input,textarea{width:100%;box-sizing:border-box;margin:0 0 8px;padding:12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#fff;font-family:sans-serif;font-size:16px}
-textarea{resize:vertical;min-height:60px}
+textarea{min-height:64px}
 .box{display:none;position:fixed;left:0;right:0;bottom:0;background:#1e293b;padding:16px;z-index:5;max-height:80vh;overflow:auto}
 .show{display:block}
 button{padding:10px 12px;margin:6px 6px 0 0;border:0;border-radius:8px}
@@ -34,23 +34,86 @@ button{padding:10px 12px;margin:6px 6px 0 0;border:0;border-radius:8px}
 <input id="title" placeholder="Titre">
 <input id="extra" placeholder="Date 11/09/2026">
 <input id="hour" placeholder="Heure 09:00">
-<textarea id="action" placeholder="Qu'est-ce que je dois faire ?"></textarea>
+<textarea id="action" placeholder="Qu est-ce que je dois faire ?"></textarea>
 <button id="ok">Enregistrer</button>
 <button id="no">Annuler</button>
 </div>
 <script>
 var tab="rdv";
-var data={rdv:[ ]};
 var editIndex=-1;
-try{data=JSON.parse(localStorage.getItem("nord_v5")||"")}catch(e){}
-if(!data||!data.rdv) data={rdv:[ ]};
+var data={rdv:[],obj:[]};
+try{
+  var raw=localStorage.getItem("nord_v5");
+  if(raw) data=JSON.parse(raw);
+}catch(e){}
+if(!data.rdv) data.rdv=[];
+if(!data.obj) data.obj=[];
 function save(){localStorage.setItem("nord_v5",JSON.stringify(data))}
-function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n/g,"<br>")}
-function parts(item){
+function items(){return tab==="rdv"?data.rdv:data.obj}
+function pad(n){n=String(n);return n.length<2?"0"+n:n}
+function stamp(item){
   var raw=(item.d||"").replace(/-/g,"/");
   var p=raw.split("/");
   var y,m,day;
-  if(p.length===3 && p[0 0];m=p[1 2 0];m=p[1 2];}
-  else return null;
+  if(p.length!==3) return "";
+  if(p[0].length===4){y=p[0];m=p[1];day=p[2];}
+  else {day=p[0];m=p[1];y=p[2];}
   var hh=(item.h||"09:00").split(":");
-  function
+  return y+pad(m)+pad(day)+"T"+pad(hh[0]||"09")+pad(hh[1]||"00")+"00";
+}
+function gcal(item){
+  var start=stamp(item);
+  if(!start){alert("Indiquez une date valide.");return;}
+  var url="https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(item.t||"Nord")+"&dates="+start+"/"+start+"&ctz=Europe/Paris&details="+encodeURIComponent(item.a||"");
+  window.open(url,"_blank");
+}
+function draw(){
+  var list=items();
+  var html="";
+  for(var i=0;i<list.length;i++){
+    var x=list[i];
+    html+='<div class="card"><b>'+(x.t||"")+"</b>";
+    html+='<div class="meta">'+(x.d||"")+" "+(x.h||"")+"</div>";
+    if(x.a) html+='<div class="act">A faire : '+x.a+"</div>";
+    html+='<button class="edit" type="button" data-i="'+i+'">Modifier</button>';
+    html+='<button class="gcal" type="button" data-i="'+i+'">Google Agenda</button>';
+    html+='<button class="del" type="button" data-i="'+i+'">Supprimer</button></div>';
+  }
+  document.getElementById("list").innerHTML=html||"Rien pour le moment.";
+}
+function openBox(item){
+  document.getElementById("title").value=item&&item.t?item.t:"";
+  document.getElementById("extra").value=item&&item.d?item.d:"";
+  document.getElementById("hour").value=item&&item.h?item.h:"";
+  document.getElementById("action").value=item&&item.a?item.a:"";
+  document.getElementById("box").className="box show";
+}
+document.getElementById("a").onclick=function(){tab="rdv";editIndex=-1;this.className="tab on";document.getElementById("b").className="tab";draw()};
+document.getElementById("b").onclick=function(){tab="obj";editIndex=-1;this.className="tab on";document.getElementById("a").className="tab";draw()};
+document.getElementById("add").onclick=function(){editIndex=-1;openBox(null)};
+document.getElementById("no").onclick=function(){editIndex=-1;document.getElementById("box").className="box"};
+document.getElementById("ok").onclick=function(){
+  var t=document.getElementById("title").value;
+  if(!t){alert("Indiquez un titre.");return;}
+  var item={t:t,d:document.getElementById("extra").value,h:document.getElementById("hour").value,a:document.getElementById("action").value};
+  var list=items();
+  if(editIndex>=0) list[editIndex]=item;
+  else list.push(item);
+  save();
+  editIndex=-1;
+  document.getElementById("box").className="box";
+  draw();
+};
+document.getElementById("list").onclick=function(e){
+  var el=e.target;
+  var i=parseInt(el.getAttribute("data-i"),10);
+  if(isNaN(i)) return;
+  var list=items();
+  if(el.className==="del"){list.splice(i,1);save();draw();return;}
+  if(el.className==="edit"){editIndex=i;openBox(list[i]);return;}
+  if(el.className==="gcal") gcal(list[i]);
+};
+draw();
+</script>
+</body>
+</html>
