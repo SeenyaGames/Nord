@@ -10,12 +10,16 @@ body{margin:0;background:#0f172a;color:#e2e8f0;font-family:sans-serif;padding:16
 .on{background:#38bdf8;color:#0f172a}
 .card{background:#1e293b;padding:12px;border-radius:12px;margin:0 0 8px}
 .add{position:fixed;left:16px;right:16px;bottom:16px;padding:14px;background:#38bdf8;color:#0f172a;border:0;border-radius:12px;font-weight:700}
-input{width:100%;box-sizing:border-box;margin:0 0 8px;padding:12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#fff}
-.box{display:none;position:fixed;left:0;right:0;bottom:0;background:#1e293b;padding:16px;z-index:5}
+input,textarea{width:100%;box-sizing:border-box;margin:0 0 8px;padding:12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#fff;font-family:sans-serif;font-size:16px}
+textarea{resize:vertical;min-height:60px}
+.box{display:none;position:fixed;left:0;right:0;bottom:0;background:#1e293b;padding:16px;z-index:5;max-height:80vh;overflow:auto}
 .show{display:block}
 button{padding:10px 12px;margin:6px 6px 0 0;border:0;border-radius:8px}
 .del{background:#7f1d1d;color:#fecaca}
-.cal{background:#1d4ed8;color:#fff}
+.gcal{background:#0b8043;color:#fff}
+.edit{background:#334155;color:#e2e8f0}
+.meta{color:#94a3b8;font-size:13px;margin:4px 0}
+.act{color:#38bdf8;font-size:13px;margin:4px 0}
 </style>
 </head>
 <body>
@@ -28,70 +32,25 @@ button{padding:10px 12px;margin:6px 6px 0 0;border:0;border-radius:8px}
 <button class="add" id="add">+ Ajouter</button>
 <div class="box" id="box">
 <input id="title" placeholder="Titre">
-<input id="extra" placeholder="Date 11/09/2026 ou 2026-09-11">
+<input id="extra" placeholder="Date 11/09/2026">
 <input id="hour" placeholder="Heure 09:00">
+<textarea id="action" placeholder="Qu'est-ce que je dois faire ?"></textarea>
 <button id="ok">Enregistrer</button>
 <button id="no">Annuler</button>
 </div>
 <script>
 var tab="rdv";
-var data={rdv:[],obj:[]};
+var data={rdv:[ ]};
+var editIndex=-1;
 try{data=JSON.parse(localStorage.getItem("nord_v5")||"")}catch(e){}
-if(!data||!data.rdv) data={rdv:[],obj:[]};
+if(!data||!data.rdv) data={rdv:[ ]};
 function save(){localStorage.setItem("nord_v5",JSON.stringify(data))}
-function draw(){
-  var items=tab==="rdv"?data.rdv:data.obj;
-  var s="";
-  for(var i=0;i<items.length;i++){
-    s+='<div class="card"><b>'+items[i].t+"</b><br>"+(items[i].d||"")+" "+(items[i].h||"");
-    s+='<br><button class="cal" type="button" data-i="'+i+'">Agenda</button>';
-    s+='<button class="del" type="button" data-i="'+i+'">Supprimer</button></div>';
-  }
-  document.getElementById("list").innerHTML=s||"Rien pour le moment.";
-}
-function ics(item){
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n/g,"<br>")}
+function parts(item){
   var raw=(item.d||"").replace(/-/g,"/");
   var p=raw.split("/");
   var y,m,day;
-  if(p.length===3 && p[0].length===4){y=p[0];m=p[1];day=p[2];}
-  else if(p.length===3){day=p[0];m=p[1];y=p[2];}
-  else return;
+  if(p.length===3 && p[0 0];m=p[1 2 0];m=p[1 2];}
+  else return null;
   var hh=(item.h||"09:00").split(":");
-  function z(n){n=String(n);return n.length<2?"0"+n:n}
-  var start=y+z(m)+z(day)+"T"+z(hh[0])+z(hh[1]||"00")+"00";
-  var txt="BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:"+item.t+"\nDTSTART:"+start+"\nDTEND:"+start+"\nBEGIN:VALARM\nTRIGGER:-PT30M\nACTION:DISPLAY\nDESCRIPTION:"+item.t+"\nEND:VALARM\nEND:VEVENT\nEND:VCALENDAR";
-  var a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([txt],{type:"text/calendar"}));
-  a.download="nord.ics";
-  a.click();
-}
-document.getElementById("a").onclick=function(){tab="rdv";this.className="tab on";document.getElementById("b").className="tab";draw()};
-document.getElementById("b").onclick=function(){tab="obj";this.className="tab on";document.getElementById("a").className="tab";draw()};
-document.getElementById("add").onclick=function(){document.getElementById("box").className="box show"};
-document.getElementById("no").onclick=function(){document.getElementById("box").className="box"};
-document.getElementById("ok").onclick=function(){
-  var t=document.getElementById("title").value;
-  if(!t) return;
-  var item={t:t,d:document.getElementById("extra").value,h:document.getElementById("hour").value};
-  if(tab==="rdv") data.rdv.push(item); else data.obj.push(item);
-  save();
-  document.getElementById("box").className="box";
-  document.getElementById("title").value="";
-  document.getElementById("extra").value="";
-  document.getElementById("hour").value="";
-  draw();
-  if(tab==="rdv") ics(item);
-};
-document.getElementById("list").onclick=function(e){
-  var el=e.target;
-  var i=parseInt(el.getAttribute("data-i"),10);
-  if(el.className==="del"){
-    if(tab==="rdv") data.rdv.splice(i,1); else data.obj.splice(i,1);
-    save();draw();
-  }
-  if(el.className==="cal") ics((tab==="rdv"?data.rdv:data.obj)[i]);
-};
-draw();
-</script>
-</body>
-</html>
+  function
