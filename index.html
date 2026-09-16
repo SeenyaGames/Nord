@@ -44,9 +44,10 @@ h1{margin:0;font-size:28px}
 .actions{display:flex;flex-wrap:wrap;gap:8px}
 .del{background:rgba(208,120,106,.18);color:var(--danger)}
 .empty{padding:36px 12px;text-align:center;color:var(--muted);border-style:dashed}
-.add{position:fixed;left:16px;right:16px;bottom:16px;min-height:48px;border:0;border-radius:14px;background:var(--primary);color:var(--bg);font-weight:700}
-.mask{position:fixed;inset:0;background:rgba(16,24,20,.7);display:flex;align-items:flex-end;z-index:20}
-.form{width:100%;background:var(--surface);border-radius:20px 20px 0 0;padding:16px}
+.add{position:fixed;left:16px;right:16px;bottom:16px;min-height:48px;border:0;border-radius:14px;background:var(--primary);color:var(--bg);font-weight:700;z-index:10}
+.mask{position:fixed;inset:0;background:rgba(16,24,20,.75);display:flex;align-items:flex-end;z-index:50}
+.form{width:100%;background:var(--surface);border-radius:20px 20px 0 0;padding:16px 16px 28px}
+.wide{width:100%;min-height:48px}
 input,textarea{width:100%;margin:6px 0 10px;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:16px}
 label{font-size:13px;color:var(--muted)}
 </style>
@@ -78,17 +79,16 @@ label{font-size:13px;color:var(--muted)}
 </div>
 <button class="add" id="add" type="button">+ Ajouter</button>
 <div class="mask" id="mask" hidden>
-  <form class="form" id="form">
+  <div class="form" id="form">
     <h2 id="ftitle">Nouveau rendez-vous</h2>
-    <label>Titre<input id="title" required></label>
-    <label>Date<input id="date" type="date" required></label>
+    <label>Titre<input id="title" type="text"></label>
+    <label>Date<input id="date" type="date"></label>
     <label id="timeLab">Heure<input id="time" type="time"></label>
     <label>Qu'est-ce que je dois faire ?<textarea id="action"></textarea></label>
-    <div class="row">
-      <button class="btn" id="cancel" type="button">Annuler</button>
-      <button class="btn on" type="submit">Enregistrer</button>
-    </div>
-  </form>
+    <p id="err" class="hint" style="color:var(--danger)"></p>
+    <button class="btn on wide" id="save" type="button" onclick="saveItem()">Enregistrer</button>
+    <button class="btn wide" id="cancel" type="button" style="margin-top:8px">Annuler</button>
+  </div>
 </div>
 <script>
 var MONTHS=["janv","fevr","mars","avr","mai","juin","juil","aout","sept","oct","nov","dec"];
@@ -99,7 +99,7 @@ var year=now.getFullYear();
 var month=now.getMonth();
 var view="month";
 var kind="rdv";
-var selected=iso(now);
+var selected=null;
 var editId=null;
 var KEY="nord-v6";
 var data={entries:[]};
@@ -108,7 +108,6 @@ if(!data.entries) data.entries=[];
 function save(){localStorage.setItem(KEY,JSON.stringify(data))}
 function iso(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
 function pad(n){n=String(n);return n.length<2?"0"+n:n}
-function parseIso(s){var p=s.split("-"); return new Date(Number(p[0]),Number(p[1])-1,Number(p[2]))}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function inMonth(date){return date.slice(0,7)===year+"-"+pad(month+1)}
 function monthGrid(y,m){
@@ -198,6 +197,30 @@ function openForm(entry){
   document.getElementById("action").value=entry?entry.action:"";
   document.getElementById("timeLab").style.display=(entry?entry.kind:kind)==="rdv"?"":"none";
   document.getElementById("mask").hidden=false;
+  document.getElementById("add").hidden=true;
+  document.getElementById("err").textContent="";
+}
+function closeForm(){
+  document.getElementById("mask").hidden=true;
+  document.getElementById("add").hidden=false;
+}
+function saveItem(){
+  var title=document.getElementById("title").value.trim();
+  var date=document.getElementById("date").value;
+  var err=document.getElementById("err");
+  if(!title){err.textContent="Ecrivez un titre."; return;}
+  if(!date){err.textContent="Choisissez une date."; return;}
+  var item={id:editId||uid(),kind:kind,title:title,date:date,time:document.getElementById("time").value,action:document.getElementById("action").value,done:false};
+  if(editId){
+    data.entries=data.entries.map(function(x){return x.id===editId?Object.assign({},x,item):x});
+  } else {
+    data.entries.push(item);
+  }
+  save();
+  var p=item.date.split("-");
+  year=Number(p[0]); month=Number(p[1])-1; selected=item.date; view="month";
+  closeForm();
+  draw();
 }
 document.getElementById("yPrev").onclick=function(){year--;draw()};
 document.getElementById("yNext").onclick=function(){year++;draw()};
@@ -206,7 +229,8 @@ document.getElementById("viewMonth").onclick=function(){view="month";draw()};
 document.getElementById("tabRdv").onclick=function(){kind="rdv";draw()};
 document.getElementById("tabObj").onclick=function(){kind="obj";draw()};
 document.getElementById("add").onclick=function(){if(view==="year") view="month"; openForm(null)};
-document.getElementById("cancel").onclick=function(){document.getElementById("mask").hidden=true};
+document.getElementById("cancel").onclick=closeForm;
+document.getElementById("save").onclick=saveItem;
 document.getElementById("monthTabs").onclick=function(e){
   var t=e.target.closest("[data-month]"); if(!t) return;
   month=Number(t.getAttribute("data-month")); selected=null; draw();
@@ -227,16 +251,6 @@ document.getElementById("list").onclick=function(e){
   if(t.getAttribute("data-del")){data.entries=data.entries.filter(function(x){return x.id!==id}); save(); draw();}
   if(t.getAttribute("data-cal")&&item) gcal(item);
   if(t.getAttribute("data-done")&&item){item.done=!item.done; save(); draw();}
-};
-document.getElementById("form").onsubmit=function(e){
-  e.preventDefault();
-  var item={id:editId||uid(),kind:kind,title:document.getElementById("title").value.trim(),date:document.getElementById("date").value,time:document.getElementById("time").value,action:document.getElementById("action").value,done:false};
-  if(!item.title) return;
-  if(editId){data.entries=data.entries.map(function(x){return x.id===editId?Object.assign({},x,item):x});}
-  else data.entries.push(item);
-  save();
-  var p=item.date.split("-"); year=Number(p[0]); month=Number(p[1])-1; selected=item.date; view="month";
-  document.getElementById("mask").hidden=true; draw();
 };
 draw();
 </script>
