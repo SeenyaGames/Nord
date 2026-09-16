@@ -249,10 +249,4 @@ document.getElementById("list").onclick=function(e){
   var item=data.entries.filter(function(x){return x.id===id})[0];
   if(t.getAttribute("data-edit")) openForm(item);
   if(t.getAttribute("data-del")){data.entries=data.entries.filter(function(x){return x.id!==id}); save(); draw();}
-  if(t.getAttribute("data-cal")&&item) gcal(item);
-  if(t.getAttribute("data-done")&&item){item.done=!item.done; save(); draw();}
-};
-draw();
-</script>
-</body>
-</html>
+  if(t.getAttribute("data-cal")&&item) 
