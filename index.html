@@ -246,7 +246,14 @@ document.getElementById("yearView").onclick=function(e){
 document.getElementById("list").onclick=function(e){
   var t=e.target.closest("button"); if(!t) return;
   var id=t.getAttribute("data-edit")||t.getAttribute("data-del")||t.getAttribute("data-cal")||t.getAttribute("data-done");
-  var item=data.entries.filter(function(x){return x.id===id})[0];
+  var item=data.entries.filter(function(x){return x.id===id}) 
+var item=data.entries.filter(function(x){return x.id===id})[0];
   if(t.getAttribute("data-edit")) openForm(item);
   if(t.getAttribute("data-del")){data.entries=data.entries.filter(function(x){return x.id!==id}); save(); draw();}
-  if(t.getAttribute("data-cal")&&item) 
+  if(t.getAttribute("data-cal")&&item) gcal(item);
+  if(t.getAttribute("data-done")&&item){item.done=!item.done; save(); draw();}
+};
+draw();
+</script>
+</body>
+</html>
