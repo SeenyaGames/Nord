@@ -12,8 +12,8 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,sans-se
 h1{margin:0;font-size:28px}
 .sub{color:var(--muted);font-size:12px;letter-spacing:.16em;text-transform:uppercase}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
-.year{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
-.year b{min-width:56px;text-align:center}
+.yearbox{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
+.yearbox b{min-width:56px;text-align:center}
 .row{display:flex;gap:8px;margin-bottom:12px}
 .btn{min-height:44px;border:0;border-radius:12px;padding:0 14px;background:var(--surface);color:var(--fg);font-weight:600}
 .btn.on{background:var(--primary);color:var(--bg)}
@@ -31,7 +31,6 @@ h1{margin:0;font-size:28px}
 .day.today{box-shadow:inset 0 0 0 1px var(--today);color:var(--today)}
 .dot{width:4px;height:4px;border-radius:99px;background:var(--primary);margin:2px auto 0}
 .yeargrid{display:grid;gap:10px}
-@media(min-width:640px){.yeargrid{grid-template-columns:1fr 1fr}}
 .mini{padding:10px;text-align:left}
 .mini h3{margin:0 0 6px;font-size:15px;text-transform:capitalize;display:flex;justify-content:space-between}
 .mini .g{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;font-size:10px;color:var(--muted)}
@@ -45,17 +44,20 @@ h1{margin:0;font-size:28px}
 .del{background:rgba(208,120,106,.18);color:var(--danger)}
 .empty{padding:36px 12px;text-align:center;color:var(--muted);border-style:dashed}
 .add{position:fixed;left:16px;right:16px;bottom:16px;min-height:48px;border:0;border-radius:14px;background:var(--primary);color:var(--bg);font-weight:700;z-index:10}
-.mask{position:fixed;inset:0;background:rgba(16,24,20,.75);display:flex;align-items:flex-end;z-index:50}
-.form{width:100%;background:var(--surface);border-radius:20px 20px 0 0;padding:16px 16px 28px}
-.wide{width:100%;min-height:48px}
-input,textarea{width:100%;margin:6px 0 10px;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:16px}
+.mask{position:fixed;inset:0;background:rgba(16,24,20,.75);align-items:flex-end;z-index:50;display:none}
+.mask.open{display:flex}
+.form{width:100%;max-height:92dvh;overflow:auto;background:var(--surface);border-radius:20px 20px 0 0;padding:16px 16px 28px}
+.wide{width:100%;min-height:48px;margin-top:8px}
+input,select,textarea{width:100%;margin:6px 0 10px;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:16px}
 label{font-size:13px;color:var(--muted)}
+.halves{display:flex;gap:8px}
+.halves>*{flex:1}
 </style>
 </head>
 <body>
 <div class="head">
   <div><div class="sub">Organisateur</div><h1>Nord</h1></div>
-  <div class="year">
+  <div class="yearbox">
     <button class="icon" id="yPrev" type="button">‹</button>
     <b id="yearLab"></b>
     <button class="icon" id="yNext" type="button">›</button>
@@ -65,7 +67,7 @@ label{font-size:13px;color:var(--muted)}
   <button class="btn" id="viewYear" type="button">Calendrier annuel</button>
   <button class="btn on" id="viewMonth" type="button">Vue mois</button>
 </div>
-<div id="yearView" hidden></div>
+<div id="yearView" style="display:none"></div>
 <div id="monthView">
   <div class="months" id="monthTabs"></div>
   <p id="monthTitle" style="font-size:20px;margin:0 0 10px;text-transform:capitalize"></p>
@@ -78,16 +80,27 @@ label{font-size:13px;color:var(--muted)}
   <div id="list"></div>
 </div>
 <button class="add" id="add" type="button">+ Ajouter</button>
-<div class="mask" id="mask" hidden>
-  <div class="form" id="form">
+<div class="mask" id="mask">
+  <div class="form">
     <h2 id="ftitle">Nouveau rendez-vous</h2>
     <label>Titre<input id="title" type="text"></label>
-    <label>Date<input id="date" type="date"></label>
-    <label id="timeLab">Heure<input id="time" type="time"></label>
+    <label>Jour
+      <div class="halves">
+        <select id="fd"></select>
+        <select id="fm"></select>
+        <select id="fy"></select>
+      </div>
+    </label>
+    <label id="timeLab">Heure
+      <div class="halves">
+        <select id="hh"></select>
+        <select id="mm"></select>
+      </div>
+    </label>
     <label>Qu'est-ce que je dois faire ?<textarea id="action"></textarea></label>
     <p id="err" class="hint" style="color:var(--danger)"></p>
     <button class="btn on wide" id="save" type="button" onclick="saveItem()">Enregistrer</button>
-    <button class="btn wide" id="cancel" type="button" style="margin-top:8px">Annuler</button>
+    <button class="btn wide" id="cancel" type="button" onclick="closeForm()">Annuler</button>
   </div>
 </div>
 <script>
@@ -101,22 +114,36 @@ var view="month";
 var kind="rdv";
 var selected=null;
 var editId=null;
-var KEY="nord-v6";
+var KEY="nord-v7";
 var data={entries:[]};
 try{var raw=localStorage.getItem(KEY); if(raw) data=JSON.parse(raw);}catch(e){}
 if(!data.entries) data.entries=[];
 function save(){localStorage.setItem(KEY,JSON.stringify(data))}
-function iso(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
 function pad(n){n=String(n);return n.length<2?"0"+n:n}
+function iso(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function inMonth(date){return date.slice(0,7)===year+"-"+pad(month+1)}
+function fillSelect(el,from,to,labels){
+  var h="";
+  for(var i=from;i<=to;i++) h+="<option value='"+i+"'>"+(labels?labels[i]:pad(i))+"</option>";
+  el.innerHTML=h;
+}
+fillSelect(document.getElementById("fd"),1,31);
+fillSelect(document.getElementById("fm"),0,11,MONTHS_LONG);
+(function(){
+  var y=document.getElementById("fy"), h="", i;
+  for(i=year-1;i<=year+4;i++) h+="<option value='"+i+"'>"+i+"</option>";
+  y.innerHTML=h;
+})();
+fillSelect(document.getElementById("hh"),0,23);
+fillSelect(document.getElementById("mm"),0,59);
 function monthGrid(y,m){
   var first=new Date(y,m,1);
   var start=new Date(first);
   var dow=(first.getDay()+6)%7;
   start.setDate(1-dow);
-  var days=[];
-  for(var i=0;i<42;i++){ var d=new Date(start); d.setDate(start.getDate()+i); days.push(d); }
+  var days=[],i,d;
+  for(i=0;i<42;i++){ d=new Date(start); d.setDate(start.getDate()+i); days.push(d); }
   return days;
 }
 function gcal(e){
@@ -125,16 +152,15 @@ function gcal(e){
   var start=ymd+"T"+hh+"00";
   var h=Number(hh.slice(0,2));
   var end=ymd+"T"+pad((h+1)%24)+hh.slice(2)+"00";
-  var url="https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(e.title)+"&dates="+start+"/"+end+"&ctz=Europe/Paris&details="+encodeURIComponent(e.action||"");
-  window.open(url,"_blank");
+  window.open("https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(e.title)+"&dates="+start+"/"+end+"&ctz=Europe/Paris&details="+encodeURIComponent(e.action||""),"_blank");
 }
 function drawYear(){
-  var html="";
-  for(var m=0;m<12;m++){
-    var days=monthGrid(year,m);
-    var count=data.entries.filter(function(e){return e.date.slice(0,7)===year+"-"+pad(m+1)}).length;
+  var html="",m,i,days,count;
+  for(m=0;m<12;m++){
+    days=monthGrid(year,m);
+    count=data.entries.filter(function(e){return e.date.slice(0,7)===year+"-"+pad(m+1)}).length;
     html+='<button class="cal mini" type="button" data-m="'+m+'"><h3>'+MONTHS_LONG[m]+' <span>'+count+'</span></h3><div class="g">';
-    for(var i=0;i<7;i++) html+="<span>"+"LMMJVSD".charAt(i)+"</span>";
+    for(i=0;i<7;i++) html+="<span>"+"LMMJVSD".charAt(i)+"</span>";
     days.forEach(function(d){
       var on=d.getMonth()===m;
       var has=on && data.entries.some(function(e){return e.date===iso(d)});
@@ -145,8 +171,7 @@ function drawYear(){
   document.getElementById("yearView").innerHTML='<div class="yeargrid">'+html+"</div>";
 }
 function drawCal(){
-  var days=monthGrid(year,month);
-  var html='<div class="grid">';
+  var days=monthGrid(year,month), html='<div class="grid">';
   WD.forEach(function(w){html+='<div class="wd">'+w+"</div>"});
   days.forEach(function(d){
     var id=iso(d);
@@ -176,8 +201,8 @@ function draw(){
   document.getElementById("yearLab").textContent=year;
   document.getElementById("viewYear").className="btn"+(view==="year"?" on":"");
   document.getElementById("viewMonth").className="btn"+(view==="month"?" on":"");
-  document.getElementById("yearView").hidden=view!=="year";
-  document.getElementById("monthView").hidden=view!=="month";
+  document.getElementById("yearView").style.display=view==="year"?"block":"none";
+  document.getElementById("monthView").style.display=view==="month"?"block":"none";
   document.getElementById("tabRdv").className="btn"+(kind==="rdv"?" on":"");
   document.getElementById("tabObj").className="btn"+(kind==="obj"?" on":"");
   document.getElementById("add").textContent=kind==="rdv"?"+ Ajouter un rendez-vous":"+ Ajouter un objectif";
@@ -188,34 +213,39 @@ function draw(){
   document.getElementById("hint").textContent=selected?"Filtre sur "+selected+". Touchez le jour pour tout le mois.":"Tous les elements du mois. Touchez un jour pour filtrer.";
   if(view==="year") drawYear(); else {drawCal(); drawList();}
 }
+function setFormDate(isoStr, timeStr){
+  var p=(isoStr||iso(now)).split("-");
+  document.getElementById("fy").value=String(Number(p[0]));
+  document.getElementById("fm").value=String(Number(p[1])-1);
+  document.getElementById("fd").value=String(Number(p[2]));
+  var t=(timeStr||"09:00").split(":");
+  document.getElementById("hh").value=String(Number(t[0]||0));
+  document.getElementById("mm").value=String(Number(t[1]||0));
+}
 function openForm(entry){
   editId=entry?entry.id:null;
   document.getElementById("ftitle").textContent=entry?"Modifier":(kind==="rdv"?"Nouveau rendez-vous":"Nouvel objectif");
   document.getElementById("title").value=entry?entry.title:"";
-  document.getElementById("date").value=entry?entry.date:(selected||iso(new Date(year,month,Math.min(now.getDate(),28))));
-  document.getElementById("time").value=entry?entry.time:(kind==="rdv"?"09:00":"");
   document.getElementById("action").value=entry?entry.action:"";
+  setFormDate(entry?entry.date:(selected||iso(new Date(year,month,Math.min(now.getDate(),28)))), entry?entry.time:(kind==="rdv"?"09:00":"09:00"));
   document.getElementById("timeLab").style.display=(entry?entry.kind:kind)==="rdv"?"":"none";
-  document.getElementById("mask").hidden=false;
-  document.getElementById("add").hidden=true;
   document.getElementById("err").textContent="";
+  document.getElementById("mask").className="mask open";
+  document.getElementById("add").style.display="none";
 }
 function closeForm(){
-  document.getElementById("mask").hidden=true;
-  document.getElementById("add").hidden=false;
+  document.getElementById("mask").className="mask";
+  document.getElementById("add").style.display="block";
 }
 function saveItem(){
   var title=document.getElementById("title").value.trim();
-  var date=document.getElementById("date").value;
   var err=document.getElementById("err");
   if(!title){err.textContent="Ecrivez un titre."; return;}
-  if(!date){err.textContent="Choisissez une date."; return;}
-  var item={id:editId||uid(),kind:kind,title:title,date:date,time:document.getElementById("time").value,action:document.getElementById("action").value,done:false};
-  if(editId){
-    data.entries=data.entries.map(function(x){return x.id===editId?Object.assign({},x,item):x});
-  } else {
-    data.entries.push(item);
-  }
+  var date=document.getElementById("fy").value+"-"+pad(Number(document.getElementById("fm").value)+1)+"-"+pad(document.getElementById("fd").value);
+  var time=pad(document.getElementById("hh").value)+":"+pad(document.getElementById("mm").value);
+  var item={id:editId||uid(),kind:kind,title:title,date:date,time:kind==="rdv"?time:"",action:document.getElementById("action").value,done:false};
+  if(editId) data.entries=data.entries.map(function(x){return x.id===editId?Object.assign({},x,item):x});
+  else data.entries.push(item);
   save();
   var p=item.date.split("-");
   year=Number(p[0]); month=Number(p[1])-1; selected=item.date; view="month";
@@ -229,8 +259,6 @@ document.getElementById("viewMonth").onclick=function(){view="month";draw()};
 document.getElementById("tabRdv").onclick=function(){kind="rdv";draw()};
 document.getElementById("tabObj").onclick=function(){kind="obj";draw()};
 document.getElementById("add").onclick=function(){if(view==="year") view="month"; openForm(null)};
-document.getElementById("cancel").onclick=closeForm;
-document.getElementById("save").onclick=saveItem;
 document.getElementById("monthTabs").onclick=function(e){
   var t=e.target.closest("[data-month]"); if(!t) return;
   month=Number(t.getAttribute("data-month")); selected=null; draw();
@@ -246,8 +274,7 @@ document.getElementById("yearView").onclick=function(e){
 document.getElementById("list").onclick=function(e){
   var t=e.target.closest("button"); if(!t) return;
   var id=t.getAttribute("data-edit")||t.getAttribute("data-del")||t.getAttribute("data-cal")||t.getAttribute("data-done");
-  var item=data.entries.filter(function(x){return x.id===id}) 
-var item=data.entries.filter(function(x){return x.id===id})[0];
+  var item=data.entries.filter(function(x){return x.id===id})[0];
   if(t.getAttribute("data-edit")) openForm(item);
   if(t.getAttribute("data-del")){data.entries=data.entries.filter(function(x){return x.id!==id}); save(); draw();}
   if(t.getAttribute("data-cal")&&item) gcal(item);
