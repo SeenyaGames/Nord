@@ -56,6 +56,23 @@ label{font-size:13px;color:var(--muted)}
 .halves>*{flex:1}
 .rec{background:#6b3a32;color:#f3d6d0}
 #vstatus{min-height:20px;margin:6px 0 0}
+.timebtn{width:100%;min-height:52px;margin:6px 0 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--fg);font-size:22px;font-weight:700;letter-spacing:.08em}
+.clockmask{position:fixed;inset:0;background:rgba(16,24,20,.8);display:none;align-items:flex-end;z-index:80}
+.clockmask.open{display:flex}
+.clockbox{width:100%;background:#f4eee6;color:#2a1c12;border-radius:20px 20px 0 0;overflow:hidden}
+.clockhead{background:#8a4f24;color:#f7efe4;padding:22px 20px 16px;font-size:48px;font-weight:300;letter-spacing:.04em}
+.clockhead b{font-weight:600}
+.clockface{width:280px;height:280px;margin:18px auto;border-radius:50%;background:#ece7df;position:relative}
+.clockface i{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-style:normal;color:#3a2a20}
+.clockface i.on{background:#8a4f24;color:#fff}
+.clockface .hand{position:absolute;left:50%;top:50%;width:2px;background:#8a4f24;transform-origin:50% 100%;border-radius:2px}
+.clockface .hub{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#8a4f24}
+.clockacts{display:flex;gap:8px;padding:8px 16px 20px}
+.clockacts .btn{flex:1;background:#efe8dc;color:#5a3a22}
+.clockacts .ok{background:#8a4f24;color:#fff}
+.mode{display:flex;justify-content:center;gap:8px;margin:0 16px 8px}
+.mode .btn{background:#efe8dc;color:#5a3a22}
+.mode .btn.on{background:#8a4f24;color:#fff}
 </style>
 </head>
 <body>
@@ -100,16 +117,30 @@ label{font-size:13px;color:var(--muted)}
       </div>
     </label>
     <label id="timeLab">Heure
-      <div class="halves">
-        <select id="hh"></select>
-        <select id="mm"></select>
-      </div>
+      <button class="timebtn" id="timeBtn" type="button">09:00</button>
+      <select id="hh" hidden></select>
+      <select id="mm" hidden></select>
     </label>
     <label>Qu'est-ce que je dois faire ?<textarea id="action"></textarea></label>
     <p id="err" class="hint" style="color:var(--danger)"></p>
     <button class="btn rec wide" id="voice2" type="button">Dicter</button>
     <button class="btn on wide" id="save" type="button" onclick="saveItem()">Enregistrer</button>
     <button class="btn wide" id="cancel" type="button" onclick="closeForm()">Annuler</button>
+  </div>
+</div>
+<div class="clockmask" id="clockmask">
+  <div class="clockbox">
+    <div class="clockhead"><span id="chH">09</span>:<span id="chM">00</span></div>
+    <div class="mode">
+      <button class="btn on" id="modeH" type="button">Heures</button>
+      <button class="btn" id="modeM" type="button">Minutes</button>
+    </div>
+    <div class="clockface" id="clockface"><div class="hand" id="chand"></div><div class="hub"></div></div>
+    <div class="clockacts">
+      <button class="btn" id="clockClear" type="button">Effacer</button>
+      <button class="btn" id="clockCancel" type="button">Annuler</button>
+      <button class="btn ok" id="clockOk" type="button">Valider</button>
+    </div>
   </div>
 </div>
 <script>
@@ -148,6 +179,62 @@ fillSelect(document.getElementById("fm"),0,11,MONTHS_LONG);
 })();
 fillSelect(document.getElementById("hh"),0,23);
 fillSelect(document.getElementById("mm"),0,59);
+var clockMode="h";
+var tmpH=9,tmpM=0;
+function syncTimeBtn(){
+  var t=pad(document.getElementById("hh").value)+":"+pad(document.getElementById("mm").value);
+  document.getElementById("timeBtn").textContent=t;
+}
+function placeNums(){
+  var face=document.getElementById("clockface");
+  var hand=document.getElementById("chand");
+  var hub=face.querySelector(".hub");
+  [].slice.call(face.querySelectorAll("i")).forEach(function(n){n.remove();});
+  var items=[],i,r,ang,x,y,val,lab,on;
+  if(clockMode==="h"){
+    for(i=1;i<=12;i++) items.push({v:i,l:String(i),ring:42});
+    for(i=13;i<=23;i++) items.push({v:i,l:String(i),ring:26});
+    items.push({v:0,l:"00",ring:26});
+  } else {
+    for(i=0;i<12;i++){ val=i*5; items.push({v:val,l:pad(val),ring:42}); }
+  }
+  items.forEach(function(it){
+    var base=clockMode==="h"?(it.v%12): (it.v/5);
+    ang=(base/12)*2*Math.PI - Math.PI/2;
+    x=50+it.ring*Math.cos(ang);
+    y=50+it.ring*Math.sin(ang);
+    on=(clockMode==="h"?tmpH===it.v:tmpM===it.v);
+    var el=document.createElement("i");
+    el.style.left=x+"%"; el.style.top=y+"%";
+    el.className=on?"on":"";
+    el.textContent=it.l;
+    el.setAttribute("data-v",it.v);
+    face.appendChild(el);
+  });
+  var shown=clockMode==="h"?(tmpH%12): (tmpM/5);
+  var deg=shown*30;
+  hand.style.height=clockMode==="h"&& (tmpH===0||tmpH>=13)?"26%":"40%";
+  hand.style.top=clockMode==="h"&& (tmpH===0||tmpH>=13)?"24%":"10%";
+  hand.style.transform="rotate("+deg+"deg)";
+  document.getElementById("chH").textContent=pad(tmpH);
+  document.getElementById("chM").textContent=pad(tmpM);
+  document.getElementById("modeH").className="btn"+(clockMode==="h"?" on":"");
+  document.getElementById("modeM").className="btn"+(clockMode==="m"?" on":"");
+}
+function openClock(){
+  tmpH=Number(document.getElementById("hh").value||9);
+  tmpM=Number(document.getElementById("mm").value||0);
+  tmpM=Math.round(tmpM/5)*5; if(tmpM===60) tmpM=0;
+  clockMode="h";
+  document.getElementById("clockmask").className="clockmask open";
+  placeNums();
+}
+function applyClock(){
+  document.getElementById("hh").value=String(tmpH);
+  document.getElementById("mm").value=String(tmpM);
+  syncTimeBtn();
+  document.getElementById("clockmask").className="clockmask";
+}
 function monthGrid(y,m){
   var first=new Date(y,m,1);
   var start=new Date(first);
@@ -232,6 +319,7 @@ function setFormDate(isoStr, timeStr){
   var t=(timeStr||"09:00").split(":");
   document.getElementById("hh").value=String(Number(t[0]||0));
   document.getElementById("mm").value=String(Number(t[1]||0));
+  syncTimeBtn();
 }
 function openForm(entry){
   editId=entry?entry.id:null;
@@ -370,6 +458,19 @@ document.getElementById("tabObj").onclick=function(){kind="obj";draw()};
 document.getElementById("add").onclick=function(){if(view==="year") view="month"; openForm(null)};
 document.getElementById("voice").onclick=startVoice;
 document.getElementById("voice2").onclick=startVoice;
+document.getElementById("timeBtn").onclick=openClock;
+document.getElementById("modeH").onclick=function(){clockMode="h";placeNums();};
+document.getElementById("modeM").onclick=function(){clockMode="m";placeNums();};
+document.getElementById("clockface").onclick=function(e){
+  var t=e.target.closest("i"); if(!t) return;
+  var v=Number(t.getAttribute("data-v"));
+  if(clockMode==="h"){tmpH=v; clockMode="m";}
+  else tmpM=v;
+  placeNums();
+};
+document.getElementById("clockOk").onclick=applyClock;
+document.getElementById("clockCancel").onclick=function(){document.getElementById("clockmask").className="clockmask";};
+document.getElementById("clockClear").onclick=function(){tmpH=9;tmpM=0;clockMode="h";placeNums();};
 document.getElementById("monthTabs").onclick=function(e){
   var t=e.target.closest("[data-month]"); if(!t) return;
   month=Number(t.getAttribute("data-month")); selected=null; draw();
